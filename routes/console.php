@@ -4,17 +4,29 @@ use App\Services\Reports\TCE;
 use App\Services\Importer\Pessoal;
 use App\Services\Importer\Pagamento;
 
-Artisan::command('tce:import:pagamento {file}', function ($file) {
-    app(Pagamento::class)->import($file);
-})->describe('Display an inspiring quote');
+Artisan::command('tce:import:pagamento {year} {month} {file}', function (
+    $year,
+    $month,
+    $file
+) {
+    app(Pagamento::class)->import($year, $month, $file);
+})->describe('Import PAGAMENTO');
 
-Artisan::command('tce:import:pessoal {file}', function ($file) {
-    app(Pessoal::class)->import($file);
-})->describe('Display an inspiring quote');
+Artisan::command('tce:import:pessoal {year} {month} {file}', function (
+    $year,
+    $month,
+    $file
+) {
+    app(Pessoal::class)->import($year, $month, $file);
+})->describe('Import PESSOAL');
 
-Artisan::command('tce:report {file}', function ($file) {
-    app(TCE::class)->toCsv($file);
-})->describe('Display an inspiring quote');
+Artisan::command('tce:report {year} {month} {file}', function (
+    $year,
+    $month,
+    $file
+) {
+    app(TCE::class)->toCsv($year, $month, $file);
+})->describe('Export REPORT');
 
 //                                                                                                      1                                                                                                   2                                                                                                   3
 //             0        1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6         7         8         9         0         1

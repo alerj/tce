@@ -11,7 +11,7 @@
 
 #### Comando
 ```
-tce:import:pagamento [input-file]
+tce:import:pagamento [year] [month] [input-file]
 ```
 
 ## Importar dados de pessoal (DISI gerou arquivo) 
@@ -23,7 +23,7 @@ MATRICULA;CPF;NOME;DATA_CESSAO;ADMISSAO /REQUISICAO /NOMEACAO;APOSENTADORIA /RET
 
 #### Comando
 ```
-tce:import:pessoal [input-file]
+tce:import:pessoal [year] [month] [input-file]
 ```
 
 ## Gerar relatório final

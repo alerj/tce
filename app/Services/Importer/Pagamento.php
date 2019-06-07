@@ -6,8 +6,17 @@ use App\Data\Models\Pagamento as PagamentoModel;
 
 class Pagamento
 {
+    const ORIGINAL_COLUMN = 7;
+
+    const START_COLUMN = 5;
+
     protected $file;
+
     protected $fileName;
+
+    protected $year;
+
+    protected $month;
 
     private function generateMatriculaFile()
     {
@@ -20,8 +29,12 @@ class Pagamento
         file_put_contents("{$this->fileName}.matricula.txt", $txt);
     }
 
-    public function import($file)
+    public function import($year, $month, $file)
     {
+        $this->year = $year;
+
+        $this->month = $month;
+
         $this->readAll($file);
 
         $this->generateMatriculaFile();
@@ -77,8 +90,9 @@ class Pagamento
     private function readLine($line)
     {
         return [
-            'ano_referencia' => 2019,
-            'mes_referencia' => 03,
+            'ano_referencia' => $this->year,
+
+            'mes_referencia' => $this->month,
 
             'tipo_folha' => '1',
 
@@ -95,24 +109,78 @@ class Pagamento
             'matricula' => $matricula,
             'matricula_sdv' => substr(remove_punctuation($matricula), 0, 6),
 
-            'nome' => ($matricula = $this->readField($line, 17, 52)),
-            'uadm' => $this->readField($line, 54, 59),
-            'cpf' => $this->readField($line, 61, 71),
-            'cargo' => $this->readField($line, 73, 97),
-            'funcao' => $this->readField($line, 99, 128),
+            'nome' => ($matricula = $this->readField(
+                $line,
+                $this->shift(17),
+                $this->shift(52)
+            )),
 
-            'rend_func' => $this->toFloat($this->readField($line, 131, 142)),
-            'comissao' => $this->toFloat($this->readField($line, 144, 158)),
-            'represent' => $this->toFloat($this->readField($line, 160, 172)),
-            'incorporado' => $this->toFloat($this->readField($line, 174, 189)),
-            'trienio' => $this->toFloat($this->readField($line, 191, 205)),
-            'abono' => $this->toFloat($this->readField($line, 207, 221)),
-            'ferias' => $this->toFloat($this->readField($line, 223, 238)),
-            'redutor' => $this->toFloat($this->readField($line, 240, 254)),
-            'previdencia' => $this->toFloat($this->readField($line, 256, 268)),
-            'ir' => $this->toFloat($this->readField($line, 270, 283)),
+            'uadm' => $this->readField(
+                $line,
+                $this->shift(54),
+                $this->shift(59)
+            ),
+
+            'cpf' => $this->readField(
+                $line,
+                $this->shift(61),
+                $this->shift(71)
+            ),
+
+            'cargo' => $this->readField(
+                $line,
+                $this->shift(73),
+                $this->shift(97)
+            ),
+
+            'funcao' => $this->readField(
+                $line,
+                $this->shift(99),
+                $this->shift(128)
+            ),
+
+            'rend_func' => $this->toFloat(
+                $this->readField($line, $this->shift(131), $this->shift(142))
+            ),
+
+            'comissao' => $this->toFloat(
+                $this->readField($line, $this->shift(144), $this->shift(158))
+            ),
+
+            'represent' => $this->toFloat(
+                $this->readField($line, $this->shift(160), $this->shift(172))
+            ),
+
+            'incorporado' => $this->toFloat(
+                $this->readField($line, $this->shift(174), $this->shift(189))
+            ),
+
+            'trienio' => $this->toFloat(
+                $this->readField($line, $this->shift(191), $this->shift(205))
+            ),
+
+            'abono' => $this->toFloat(
+                $this->readField($line, $this->shift(207), $this->shift(221))
+            ),
+
+            'ferias' => $this->toFloat(
+                $this->readField($line, $this->shift(223), $this->shift(238))
+            ),
+
+            'redutor' => $this->toFloat(
+                $this->readField($line, $this->shift(240), $this->shift(254))
+            ),
+
+            'previdencia' => $this->toFloat(
+                $this->readField($line, $this->shift(256), $this->shift(268))
+            ),
+
+            'ir' => $this->toFloat(
+                $this->readField($line, $this->shift(270), $this->shift(283))
+            ),
+
             'total_liquido' => $this->toFloat(
-                $this->readField($line, 285, 300)
+                $this->readField($line, $this->shift(285), $this->shift(300))
             ),
         ];
     }
@@ -123,7 +191,8 @@ class Pagamento
      */
     private function readMatricula($line): string
     {
-        return $this->readField($line, 7, 15);
+        dump($this->readField($line, $this->shift(7), $this->shift(15)));
+        return $this->readField($line, $this->shift(7), $this->shift(15));
     }
 
     private function removeNulls($record)
@@ -135,7 +204,9 @@ class Pagamento
 
     private function store()
     {
-        PagamentoModel::truncate();
+        PagamentoModel::where('ano_referencia', $this->year)
+            ->where('mes_referencia', $this->month)
+            ->delete();
 
         $this->file->each(function ($record) {
             PagamentoModel::create($this->removeNulls($record)->toArray());
@@ -147,5 +218,10 @@ class Pagamento
         $value = floatval(str_replace(',', '.', str_replace('.', '', $string)));
 
         return $value !== 0.0 ? $value : null;
+    }
+
+    public function shift($value)
+    {
+        return $value + (static::START_COLUMN - static::ORIGINAL_COLUMN);
     }
 }

@@ -28,6 +28,10 @@ Artisan::command('tce:report {year} {month} {file}', function (
     app(TCE::class)->toCsv($year, $month, $file);
 })->describe('Export REPORT');
 
+Artisan::command('tce:list-inactive {year} {month}', function ($year, $month) {
+    app(TCE::class)->listInactive($year, $month, $this);
+})->describe('Export REPORT');
+
 //                                                                                                      1                                                                                                   2                                                                                                   3
 //             0        1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6         7         8         9         0         1
 //             1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890

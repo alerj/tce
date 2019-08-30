@@ -3,14 +3,31 @@
 namespace App\Services\Importer;
 
 use App\Data\Models\Pessoal as PessoalModel;
+use Illuminate\Support\Str;
+use League\Csv\Reader;
+use League\Csv\ResultSet;
 
 class Pessoal
 {
     protected $file;
+
     protected $fileName;
 
-    public function import($file)
+    protected $year;
+
+    protected $month;
+
+    private function cleanString($string)
     {
+        return str_replace(["\r", "\n", "\t"], ['', '', '', ''], $string);
+    }
+
+    public function import($year, $month, $file)
+    {
+        $this->year = $year;
+
+        $this->month = $month;
+
         $this->readAll($file);
 
         $this->store();
@@ -25,29 +42,29 @@ class Pessoal
 
     private function readFile($file)
     {
-        return collect(explode("\r", file_get_contents($file)))
-            ->map(function ($line) {
-                return $this->readLine($line);
-            })
-            ->slice(1);
-    }
+        $reader = Reader::createFromPath($file, 'r');
+        $reader->setDelimiter(';');
+        $reader->setHeaderOffset(0);
 
-    private function readLine($line)
-    {
-        $line = explode(';', $line);
+        $result = [];
 
-        return [
-            'matricula' => $line[0],
-            'cpf' => $line[1],
-            'nome' => $line[2],
-            'data_cessao' => $line[3],
-            'data_admissao' => $line[4],
-            'data_inatividade' => $line[5],
-            // 'descricao' => $line[6],
-            'orgao_cessao' => $line[7],
-            'municipio_cessao' => $line[8],
-            'cedido_para' => $line[9],
-        ];
+        foreach ($reader->getRecords() as $record) {
+            $result[] = collect($record)
+                ->mapWithKeys(function ($record, $column) {
+                    return [Str::lower($column) => $record];
+                })
+                ->toArray();
+        }
+
+        return collect($result)->map(function ($data) {
+            $data['matricula_sdv'] = substr(
+                remove_punctuation($data['matricula']),
+                0,
+                6
+            );
+
+            return $data;
+        });
     }
 
     private function removeNulls($record)
@@ -59,7 +76,9 @@ class Pessoal
 
     private function store()
     {
-        PessoalModel::truncate();
+        PessoalModel::where('ano_referencia', $this->year)
+            ->where('mes_referencia', $this->month)
+            ->delete();
 
         $this->file->each(function ($record) {
             PessoalModel::create($this->removeNulls($record)->toArray());

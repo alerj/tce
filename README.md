@@ -30,3 +30,7 @@ tce:import:pessoal [year] [month] [input-file]
 ```
 tce:report [output-file]            
 ```
+
+API de Acesso
+http://intrahom2008/SARH/eTCEWebApi/Help
+http://intrahom2008/SARH/eTCEWebApi/ConsultarFuncionarioPeriodo/values?matricula=201794&dataInicial=01/05/2019&dataFinal=31/05/2019

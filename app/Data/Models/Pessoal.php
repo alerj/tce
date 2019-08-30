@@ -10,6 +10,7 @@ class Pessoal extends Model
 
     protected $fillable = [
         'matricula',
+        'matricula_sdv',
         'cpf',
         'nome',
         'data_cessao',
@@ -18,5 +19,7 @@ class Pessoal extends Model
         'orgao_cessao',
         'municipio_cessao',
         'cedido_para',
+        'ano_referencia',
+        'mes_referencia'
     ];
 }

@@ -2,13 +2,40 @@
 
 namespace App\Services\Importer;
 
+use Carbon\Carbon;
+use GuzzleHttp\Client as Guzzle;
+use App\Data\Models\Pessoal as PessoalModel;
 use App\Data\Models\Pagamento as PagamentoModel;
 
 class Pagamento
 {
     const ORIGINAL_COLUMN = 7;
 
-    const START_COLUMN = 5;
+    const START_COLUMN = 3;
+
+    const SPACE_SIZE = 1;
+
+    protected $columns = [
+        'datref' => 8,
+        'matricula' => 11,
+        'nome' => 36,
+        'uadm' => 6,
+        'cpf' => 11,
+        'cargo' => 25,
+        'funcao' => 28,
+        'rend_func' => 15,
+        'comissao' => 15,
+        'represent' => 13,
+        'incorporado' => 16,
+        'trienio' => 15,
+        'abono' => 15,
+        'ferias' => 16,
+        'redutor' => 15,
+        'rubrica' => 13,
+        'previdencia' => 14,
+        'ir' => 14,
+        'total_liquido' => 16
+    ];
 
     protected $file;
 
@@ -17,6 +44,13 @@ class Pagamento
     protected $year;
 
     protected $month;
+
+    protected $guzzle;
+
+    public function __construct()
+    {
+        $this->instantiateGuzzle();
+    }
 
     private function generateMatriculaFile()
     {
@@ -27,6 +61,32 @@ class Pagamento
         });
 
         file_put_contents("{$this->fileName}.matricula.txt", $txt);
+    }
+
+    private function getFromPessoal($matricula)
+    {
+        $url = sprintf(
+            'http://intrahom2008/SARH/eTCEWebApi/ConsultarFuncionarioPeriodo/values?matricula=%s&dataInicial=%s&dataFinal=%s',
+            $this->matriculaWithoutDigit($matricula),
+            Carbon::createFromDate($this->year, $this->month, 1),
+            Carbon::createFromDate($this->year, $this->month, 1)->endOfMonth()
+        );
+
+        $response = $this->guzzle->request('GET', $url, [
+            'auth' => [
+                config('app.webservice.username'),
+                config('app.webservice.password'),
+                'ntlm'
+            ]
+        ]);
+
+        $body = json_decode((string) $response->getBody(), true);
+
+        if (blank($body)) {
+            throw new \Exception('GET error: ' . $url);
+        }
+
+        return $body[0];
     }
 
     public function import($year, $month, $file)
@@ -40,6 +100,13 @@ class Pagamento
         $this->generateMatriculaFile();
 
         $this->store();
+
+        // $this->storePessoal(); //// GET FROM WEBSERVICE - TEMPORARILY DEPRECATED ACCORDING TO EMAILS
+    }
+
+    private function instantiateGuzzle()
+    {
+        $this->guzzle = new Guzzle();
     }
 
     private function isMatricula($matricula)
@@ -64,6 +131,11 @@ class Pagamento
         return null;
     }
 
+    private function matriculaWithoutDigit($matricula)
+    {
+        return substr(only_numbers($matricula), 0, 6);
+    }
+
     private function readAll($file)
     {
         $this->fileName = $file;
@@ -71,9 +143,11 @@ class Pagamento
         $this->file = $this->readFile($file);
     }
 
-    private function readField($line, int $start, int $end)
+    private function readField($line, $field)
     {
-        return trim(substr($line, $start - 1, $end - $start + 1));
+        $array = $this->readLineToArray($line, $field);
+
+        return trim($array[$field]);
     }
 
     private function readFile($file)
@@ -107,82 +181,64 @@ class Pagamento
             'tipo_cargo' => '07', // outros
 
             'matricula' => $matricula,
+
             'matricula_sdv' => substr(remove_punctuation($matricula), 0, 6),
 
-            'nome' => ($matricula = $this->readField(
-                $line,
-                $this->shift(17),
-                $this->shift(52)
-            )),
+            'nome' => $this->readField($line, 'nome'),
 
-            'uadm' => $this->readField(
-                $line,
-                $this->shift(54),
-                $this->shift(59)
-            ),
+            'uadm' => $this->readField($line, 'uadm'),
 
-            'cpf' => $this->readField(
-                $line,
-                $this->shift(61),
-                $this->shift(71)
-            ),
+            'cpf' => $this->readField($line, 'cpf'),
 
-            'cargo' => $this->readField(
-                $line,
-                $this->shift(73),
-                $this->shift(97)
-            ),
+            'cargo' => $this->readField($line, 'cargo'),
 
-            'funcao' => $this->readField(
-                $line,
-                $this->shift(99),
-                $this->shift(128)
-            ),
+            'funcao' => $this->readField($line, 'funcao'),
 
-            'rend_func' => $this->toFloat(
-                $this->readField($line, $this->shift(131), $this->shift(142))
-            ),
+            'rend_func' => $this->toFloat($this->readField($line, 'rend_func')),
 
-            'comissao' => $this->toFloat(
-                $this->readField($line, $this->shift(144), $this->shift(158))
-            ),
+            'comissao' => $this->toFloat($this->readField($line, 'comissao')),
 
-            'represent' => $this->toFloat(
-                $this->readField($line, $this->shift(160), $this->shift(172))
-            ),
+            'represent' => $this->toFloat($this->readField($line, 'represent')),
 
             'incorporado' => $this->toFloat(
-                $this->readField($line, $this->shift(174), $this->shift(189))
+                $this->readField($line, 'incorporado')
             ),
 
-            'trienio' => $this->toFloat(
-                $this->readField($line, $this->shift(191), $this->shift(205))
-            ),
+            'trienio' => $this->toFloat($this->readField($line, 'trienio')),
 
-            'abono' => $this->toFloat(
-                $this->readField($line, $this->shift(207), $this->shift(221))
-            ),
+            'abono' => $this->toFloat($this->readField($line, 'abono')),
 
-            'ferias' => $this->toFloat(
-                $this->readField($line, $this->shift(223), $this->shift(238))
-            ),
+            'ferias' => $this->toFloat($this->readField($line, 'ferias')),
 
-            'redutor' => $this->toFloat(
-                $this->readField($line, $this->shift(240), $this->shift(254))
-            ),
+            'redutor' => $this->toFloat($this->readField($line, 'redutor')),
 
             'previdencia' => $this->toFloat(
-                $this->readField($line, $this->shift(256), $this->shift(268))
+                $this->readField($line, 'previdencia')
             ),
 
-            'ir' => $this->toFloat(
-                $this->readField($line, $this->shift(270), $this->shift(283))
-            ),
+            'ir' => $this->toFloat($this->readField($line, 'ir')),
 
             'total_liquido' => $this->toFloat(
-                $this->readField($line, $this->shift(285), $this->shift(300))
-            ),
+                $this->readField($line, 'total_liquido')
+            )
         ];
+    }
+
+    private function readLineToArray($line, $field)
+    {
+        $line = substr($line, static::START_COLUMN - 1);
+
+        $array = [];
+
+        $position = 0;
+
+        foreach ($this->columns as $key => $size) {
+            $array[$key] = substr($line, $position, $size);
+
+            $position += $size + static::SPACE_SIZE;
+        }
+
+        return $array;
     }
 
     /**
@@ -191,8 +247,15 @@ class Pagamento
      */
     private function readMatricula($line): string
     {
-        dump($this->readField($line, $this->shift(7), $this->shift(15)));
-        return $this->readField($line, $this->shift(7), $this->shift(15));
+        if (
+            $this->isMatricula(
+                $matricula = $this->readField($line, 'matricula')
+            )
+        ) {
+            dump($matricula);
+        }
+
+        return $matricula;
     }
 
     private function removeNulls($record)
@@ -210,6 +273,41 @@ class Pagamento
 
         $this->file->each(function ($record) {
             PagamentoModel::create($this->removeNulls($record)->toArray());
+        });
+    }
+
+    private function storePessoal()
+    {
+        PessoalModel::where('ano_referencia', $this->year)
+            ->where('mes_referencia', $this->month)
+            ->delete();
+
+        $this->file->each(function ($record) {
+            $pessoa = $this->getFromPessoal($record['matricula']);
+
+            $pessoa = collect([
+                'matricula' => $pessoa['MATRICULA'],
+                'cpf' => $pessoa['CPF'],
+                'nome' => $pessoa['NOME'],
+                'data_cessao' => $pessoa['DATA_CESSAO'],
+                'data_admissao' => $pessoa['DATA_ADMISSAO'],
+                'data_inatividade' => $pessoa['DATA_INATIVIDADE'],
+                'orgao_cessao' => $pessoa['ORGAO_CESSAO'],
+                //                'descricao' => $pessoa[''], /// tinha no arquivo anterior mas no webservice não tem mais
+                //                'municipio_cessao' => $pessoa[''],
+                //                'cedido_para' => $pessoa[''],
+                'ano_referencia' => $pessoa['ANO_REFERENCIA'],
+                'mes_referencia' => $pessoa['MES_REFERENCIA'],
+                'tipo_folha' => $pessoa['MES_REFERENCIA'],
+                'situacao_funcionar' => $pessoa['SITUACAO_FUNCIONAL'],
+                'tipo_cargo' => $pessoa['TIPO_CARGO'],
+                'cargo' => $pessoa['CARGO'],
+                'funcao' => $pessoa['FUNCAO']
+            ]);
+
+            PessoalModel::create($this->removeNulls($pessoa)->toArray());
+
+            dump('Pessoa: ' . $pessoa['matricula'] . ' - ' . $pessoa['nome']);
         });
     }
 
